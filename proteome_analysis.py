@@ -80,17 +80,19 @@ def input_email():
 def run_blast2go_cli(taxid,group_names):
 
     print(">"*30+"运行blast2go_shell脚本"+"<"*30)
+    print("工作路径:【{0}】".format(os.getcwd()))
+    print("Annotation文件路径:【{0}】".format("/project/" + os.getcwd().split("/")[-1]))
     fasta_file_name = "GO/query_all.fasta"
     raw_path = os.getcwd()
     fasta_file_name = os.path.join(os.getcwd(),fasta_file_name)
     annot_file_dir = os.getcwd().split("/")[-1]
-    cli_path = "/home/lijuan.chen/blast2go_commandline/blast2go_cli_v1.3.3"
+    cli_path = "/genechem/program/blast2go_cli_v1.4.4" #"/home/lijuan.chen/blast2go_commandline/blast2go_cli_v1.3.3"
     os.chdir(cli_path)
     #print(os.getcwd())
     command = "bash blast2go_shell.sh {0} uniprot-reviewed%3Ayes+taxonomy%3A{1}.fasta {2}".format(fasta_file_name, taxid, annot_file_dir)
     os.system(command)
     os.chdir(raw_path)
-    cli_path = "/home/lijuan.chen/blast2go_commandline/blast2go_cli_v1.3.3"
+    cli_path = "/project" #"/home/lijuan.chen/blast2go_commandline/blast2go_cli_v1.3.3"
     annot_file_dir = os.getcwd().split("/")[-1]
     all_annot_file = cli_path + "/"  +  annot_file_dir + "/" + "query_all.fasta.annot"
 # blast_top_hit = "blast2go命令结果"

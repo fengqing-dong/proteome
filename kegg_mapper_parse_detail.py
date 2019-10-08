@@ -1,24 +1,24 @@
-from selenium import webdriver
-import time
-import os
-import shutil
-import zmail
-from urllib import request
-import urllib
-import re
-import lxml
-import requests
-from bs4 import BeautifulSoup
-from scipy import stats
-from statsmodels.stats import multitest
-from itertools import islice
-import matplotlib.pyplot as plt
-import numpy as np
-from matplotlib.font_manager import FontProperties
 import math
 import multiprocessing
+import os
+import re
+import shutil
 import sys
-
+import time
+import urllib
+from itertools import islice
+# from urllib import request
+import xlrd
+# import lxml
+import matplotlib.pyplot as plt
+import numpy as np
+import requests
+import zmail
+from bs4 import BeautifulSoup
+from matplotlib.font_manager import FontProperties
+from scipy import stats
+from selenium import webdriver
+from statsmodels.stats import multitest
 
 
 def download_file(download_url, file_name, file_format,diff_or_all):
@@ -397,7 +397,7 @@ def file_generate(diff_or_all):
             protein = map2query_dict[mappid_list[i-1]]
             map_url_ko = [user_ko_dict[i] for i in protein.split(" ") ]
             map_url= "http://www.kegg.jp/kegg-bin/show_pathway?{}+{}".format(mappid_list[i-1],"+".join(map_url_ko))
-            map2query.write("{0}\t{1}\t{2}\t{3}\t{4}\n".format(mappid_list[i-1],mappid_list[i],protein,len(protein.split(" ")),map_url))
+            map2query.write("{0}\t{1}\t{2}\t{3}\t{4}\n".format(mappid_list[i-1],mappid_list[i],protein.replace(" ",","),len(protein.split(" ")),map_url))
     mappids.close()
     map2query.close()
     print("本地匹配，文件生成正常！")
@@ -429,12 +429,14 @@ def kegg_enrich(diff_multi,all_total):
         diff_total = diff_multi[diff_or_all]
         diff_group = diff_or_all.strip().split("_")[1]
 
+        map_url = dict()
 
         #todo 进入多分组的子文件夹后富集分析  ---done
         map2query_diff = open("./KEGG_diff/{0}/map2query.txt".format(diff_group), "r")
         enrich = list()
         for line in islice(map2query_diff, 1, None):
             line = line.strip().split("\t")
+            map_url[line[0]] = line[-1]
             new_line = line[:4]
 
             map2query_all = open("./KEGG_all/map2query_all.txt", "r")
@@ -481,7 +483,7 @@ def kegg_enrich(diff_multi,all_total):
         enrich = sorted(enrich,key=lambda s:float(s[7]))
         for i in range(len(enrich)):
 #            line_temp = enrich[i][0:2] + enrich[i][3:8] + [str(fdr_list[i])] + [enrich[i][8]] + [enrich[i][2]]
-            line_temp = enrich[i][0:2] + [enrich[i][3]]+[enrich[i][7]] + [str(fdr_list[i])] + [enrich[i][8]] + [enrich[i][2]]
+            line_temp = enrich[i][0:2] + [enrich[i][3]]+[enrich[i][7]] + [str(fdr_list[i])] + [enrich[i][8]] + [enrich[i][2].replace(" ",",")]
             line = "\t".join(line_temp) + "\n"
             rich_file.write(line)
 
@@ -520,7 +522,7 @@ def enrich_kegg_plot(diff_multi):
         p_max = max(p_value)
 
         plt.rcdefaults()
-        customer_font = FontProperties(fname=r"/home/fdong/auto_protein_analysis/Helvetica.ttf")
+        # customer_font = FontProperties(fname=r"/home/fdong/auto_protein_analysis/Helvetica.ttf")
 
         # (width, height)
         len_max = max([len(term) for term in name])
@@ -603,9 +605,49 @@ def check_map(map_url_list,diff_or_all):
             download_map(map_url_remain, diff_or_all)
 
 
+def add_detail_sheet(group):
+    workbook = xlrd.open_workbook(u"附件1_蛋白质鉴定列表.xlsx")
+    table = workbook.sheets()[0]
+    protein_all = table.col_values(0)
+    protein_all.pop(0)
+    gene_symbol_all = table.col_values(1)
+    gene_symbol_all.pop(0)
+    if "|" in protein_all[1]:
+        for i in range(len(protein_all)):
+            protein_all[i] = protein_all[i].split("|")[1]
+
+    protein_gene = dict(zip(protein_all, gene_symbol_all))
+    for key, value in protein_gene.items():
+        if not value:
+            protein_gene[key] = "-"
+#    open("protein_gene.txt","w").write(str(protein_gene))  # 将字典写入文件
+
+    path = "./KEGG_diff/{0}/".format(group)
+    file = open("{}map2query.txt".format(path),"r")
+    map_url = {line.split("\t")[0]:line.strip().split("\t")[-1] for line in islice(file, 1 , None)}
+    file.close()
+    
+    filein = open("{}enrichment.txt".format(path),"r")
+    fileout = open("{}enrichment_total.txt".format(path),"w")
+    fileout2 = open("{}enrichment_significant.txt".format(path),"w")
+    title = filein.__next__().strip()+"\tGene Name\tURL\n"
+    fileout.write(title)
+    fileout2.write(title)
+    for line in filein:
+        genes = ",".join([protein_gene[protein] for protein in line.strip().split("\t")[-1].split(",")])
+        line = line.strip() + "\t" + genes + "\t" + map_url[line.split("\t")[0]] + "\n"
+        fileout.write(line)
+        if float(line.split("\t")[3])<0.05 and line.split("\t")[5] =="Over":
+            fileout2.write(line)
+    filein.close()
+    fileout.close()
+
+
+  
+
 def txt2excel(group):
     path = "./KEGG_diff/{0}/".format(group)
-    command = "perl /home/fdong/auto_protein_analysis/TXToXLSX.pl {0}KEGG.xlsx {0}query2map.txt {0}map2query.txt {0}enrichment.txt".format(path)
+    command = "perl /home/fdong/auto_protein_analysis/TXToXLSX.pl {0}KEGG.xlsx {0}query2map.txt {0}map2query.txt {0}enrichment_significant.txt {0}enrichment_total.txt".format(path)
     os.system(command)
 
 
@@ -650,7 +692,8 @@ def main_func(taxid=None,email_info=None,map_download=None):
                     pool.close()
                     pool.join()
                     check_map(map_url_list, diff_or_all)
-                txt2excel(diff_group)
+#                add_detail_sheet(diff_group)
+#                txt2excel(diff_group)
             elif re.search("all",file, re.IGNORECASE):
                 diff_or_all = "all"
                 if not os.path.exists("KEGG_all"):
@@ -684,6 +727,10 @@ def main_func(taxid=None,email_info=None,map_download=None):
     (diff_multi, all_total) = get_fasta_len()
     kegg_enrich(diff_multi,all_total)
     enrich_kegg_plot(diff_multi)
+    for group in diff_multi:
+        diff_group = group.split("_")[1]
+        add_detail_sheet(diff_group)
+        txt2excel(diff_group)
   
     # 移动文件
     file_move(diff_multi)
@@ -709,27 +756,3 @@ if __name__ == '__main__':
     m, s = divmod(end - start, 60)  # 转换时间的方法
     h, m = divmod(m, 60)
     print('任务完成，共耗时%02d小时%02d分%02d秒' % (h, m, s))
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

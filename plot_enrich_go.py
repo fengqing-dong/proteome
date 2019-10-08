@@ -55,7 +55,7 @@ def _enrich_go_plot(lengend_offset=None,axes_start=None):
     # plt.rcParams['figure.autolayout'] = True
     plt.rcParams['figure.figsize'] = (width_user, height_user)
     if height_user<6:
-        height_user=6
+        height_user=5.5
 
     #todo bp,mf,cc为空的情况???
     fig = plt.figure()
@@ -88,7 +88,7 @@ def _enrich_go_plot(lengend_offset=None,axes_start=None):
     if not int(p_max)>9:
         ax.set_xticks(range(0, int(p_max+1)+1))
     if not lengend_offset:
-        lengend_offset  = (3-(int(p_max+1) - (max(percent_bp[:3])+1)*1.3)/int(p_max+1)*8.5)/8.4 +1
+        lengend_offset  = (3-(int(p_max+1) - (max(sorted(percent,reverse=True)[-3:])+1)*1.3)/int(p_max+1)*8.5)/8.4 +1
     plot_list = []
     plot_list_name = []
     if p3:

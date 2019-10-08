@@ -24,7 +24,7 @@ from matplotlib.colors import ListedColormap
 
 
 def hcluster2():
-    def get_new_colormap():
+    def get_new_colormap(up,down):
 
         # coolwarm111 = cm.get_cmap('coolwarm', 256)
         # bwr111 = cm.get_cmap('bwr', 256)
@@ -58,8 +58,8 @@ def hcluster2():
         top = cm.get_cmap(newcmp2,100)
         bottom = cm.get_cmap(newcmp1.reversed(), 100)
 
-        newcolors = np.vstack((top(np.linspace(0, 1, 50))[:48,:],
-                               bottom(np.linspace(0, 1, 50))[2:,:]))
+        newcolors = np.vstack((top(np.linspace(0, 1, int(10*up))),
+                               bottom(np.linspace(0, 1,int(10*down)))))
         newcmp = ListedColormap(newcolors, name='OrangeBlue').reversed()
         return newcmp
         # newcmp = "seismic"
@@ -69,13 +69,16 @@ def hcluster2():
         df = pd.read_csv(file, header=0, index_col=0,sep="\t")
         df = matrix.ClusterGrid(df).format_data(df, None, z_score=0)
         df.to_csv("cluster_data.txt",sep="\t")
+        up = round(abs(df.max().max()),1)
+        down = round(abs(df.min().min()),1)
+        newcmp = get_new_colormap(up,down)
         col_name_length_max = max([len(name) for name in df.columns])
         row_name_length_max = max([len(name) for name in df.index])+2
         rows,cols = df.shape
         # fig = plt.figure(figsize=[6,2.5])   10
         # fig = plt.figure(figsize=[13,25])   100
         pic_width = 11+row_name_length_max*20/150
-        pic_height = 4+0.2*rows
+        pic_height = 4+0.18*rows
         print(pic_height)
         # x_start = 2.5/pic_width
         # plot_width = 8.5/pic_width
@@ -89,7 +92,7 @@ def hcluster2():
         ax1.set_axis_off()
 
         # Compute and plot row dendrogram.
-        ax2 = fig.add_axes([0.0, 1.5/pic_height, 2.5/pic_width, 0.2*rows/pic_height])
+        ax2 = fig.add_axes([0.0, 1.5/pic_height, 2.5/pic_width, 0.18*rows/pic_height])
         row_link = sch.linkage(df, method='average')
         z2 = sch.dendrogram(row_link,orientation='left',color_threshold=0,above_threshold_color="black",ax=ax2)
         row_name = df.index[z2["leaves"]]
@@ -101,8 +104,8 @@ def hcluster2():
 
         # Compute and plot heatmap.
         heatmap_data = df.values[z2["leaves"], :][:, z1["leaves"]]
-        ax3 = fig.add_axes([2.5/pic_width, 1.5/pic_height, 8.5/pic_width, 0.2*rows/pic_height])
-        mesh = ax3.pcolormesh(heatmap_data, cmap=newcmp,vmin=-2, vmax=2)
+        ax3 = fig.add_axes([2.5/pic_width, 1.5/pic_height, 8.5/pic_width, 0.18*rows/pic_height])
+        mesh = ax3.pcolormesh(heatmap_data, cmap=newcmp,vmin=-down, vmax=up)
         sns.heatmap(heatmap_data,ax=ax3,cbar=None, linewidths=0.01, cmap=newcmp,yticklabels=False,xticklabels=False)
         # set yaxis
         ax3.set_yticks(np.arange(len(row_name))+0.5)
@@ -130,6 +133,10 @@ def hcluster2():
         df = pd.read_csv(file, header=0, index_col=0,sep="\t")
         df = matrix.ClusterGrid(df).format_data(df, None, z_score=0)
         rows, cols = df.shape
+        up = round(abs(df.max().max()),1)
+        down = round(abs(df.min().min()),1)
+        newcmp = get_new_colormap(up,down)
+
         pic_width = 4
         if rows>=50:
             pic_height = 4
@@ -156,7 +163,7 @@ def hcluster2():
         xlabel_len_max = max([len(name) for name in col_name])+3
         heatmap_data = df.values[z2["leaves"], :][:, z1["leaves"]]
         ax3 = fig.add_axes([0.02,xlabel_len_max*0.025, 0.8, 0.9-xlabel_len_max*0.025])
-        mesh = ax3.pcolormesh(heatmap_data, cmap=newcmp,vmin=-2, vmax=2)
+        mesh = ax3.pcolormesh(heatmap_data, cmap=newcmp,vmin=-down, vmax=up)
         # sns.heatmap(heatmap_data,ax=ax3,cbar=None, linewidths=0.01, cmap=newcmp,yticklabels=False,xticklabels=False)
         sns.heatmap(heatmap_data, ax=ax3, cbar=None, linewidths=0, cmap=newcmp, yticklabels=False, xticklabels=False)
 
@@ -174,7 +181,6 @@ def hcluster2():
         fig.savefig("cluster_heatmap_small.png",dpi=150)
 
 
-    newcmp = get_new_colormap()
     file = "cluster_diff.txt"
     plot_cluster_heatmap_detail(file)
     plot_cluster_heatmap_small(file)
