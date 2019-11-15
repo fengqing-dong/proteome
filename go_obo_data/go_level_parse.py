@@ -279,17 +279,27 @@ def generate_obsolered_go():
     non_obsolete_go = [term.strip() for term in non_obsolete_file if "level" not in term]
     non_obsolete_file.close()
     obsolete_go = [term for term in go_name_list if term not in non_obsolete_go]
-    open("obsoleted_go.txt","w").write("\n".join(obsolete_go))
+    open("/home/fdong/auto_protein_analysis/go_obo_data/obsoleted_go.txt","w").write("\n".join(obsolete_go))
 
 
 if __name__ == '__main__':
     start = time.time()
 
-    get_go_obo_lastest()
+    #get_go_obo_lastest()
 
     go_name_list, go_info_list = parse_go_obo()   # 8s
     is_a_index = get_is_a_index(go_name_list,go_info_list) #80s
-
+    
+    alt_go_dict = dict()
+    alt_go = list()
+    for line in go_info_list:
+        alt_go.extend(line[3])
+        if line[3]:
+            alt_go_dict[line[0]] = line[3]
+    alt_go = set(alt_go)
+    open("/home/fdong/auto_protein_analysis/go_obo_data/alt_go.txt","w").write("\n".join(alt_go))
+    open("/home/fdong/auto_protein_analysis/go_obo_data/alt_go_dict.txt","w").write(str(alt_go_dict))
+    
     generating_go_level_confirm(is_a_index,go_name_list,go_info_list)   #420s,230s
     generating_go_tree_up2down(is_a_index,go_name_list, go_info_list) #660  110s
     generating_go_tree_down2up(go_info_list)
@@ -300,33 +310,5 @@ if __name__ == '__main__':
     m, s = divmod(end - start, 60)  # 转换时间的方法
     h, m = divmod(m, 60)
     print('任务完成，共耗时%02d小时%02d分%02d秒' % (h, m, s))
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
