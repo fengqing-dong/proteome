@@ -24,11 +24,15 @@ def _enrich_go_plot(lengend_offset=None,axes_start=None):
         try:
             filtered = filter(lambda line: line.split("\t")[6] == "Over" and line.split("\t")[2] == bp_mf_cc and float(
                 line.split("\t")[4]) < 0.05, open("enrichment.txt", "r"))
-            sorted_temp = sorted(filtered, key=lambda s: float(s.split("\t")[4]))[:10]
+            sorted_temp = sorted(filtered, key=lambda s: float(s.split("\t")[4]))
             for line in list(sorted_temp):
+                if len(term)>=10:
+                    break
+#                if line.split("\t")[1] in term:
+#                    continue
                 term.append(line.split('\t')[1])
                 percent.append(-math.log(float(line.split('\t')[4]),10))
-            enrich_go.write(''.join(sorted_temp))
+                enrich_go.write(line)
             percent.reverse()
             term.reverse()
         except:

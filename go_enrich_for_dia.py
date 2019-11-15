@@ -233,6 +233,10 @@ def go_enrich(diff, all_total, group):
         enrich[i].append(str(p_value))
         enrich[i].append(str(over_under))
 
+    alt_go_file = open("/home/fdong/auto_protein_analysis/go_obo_data/alt_go.txt","r")
+    alt_go = list()
+    for line in alt_go_file:
+        alt_go.append(line.strip())
 
     fdr_list = multitest.multipletests(p_value_list, method="fdr_bh")[1]
 #    title = ['GO-ID', 'Term', 'Category', 'FDR', 'P-Value', '#DIFF', '#REF', '%Diff', '%Ref', 'Over/Under', 'TestSeqs']
@@ -242,61 +246,16 @@ def go_enrich(diff, all_total, group):
 #    enrich = sorted(enrich,key = lambda line:float(line[8]))
     enrich = sorted(enrich,key = lambda line:float(line[8]))
 
-   
     term_temp = list()
     for i in enrich:
         term_temp.append(i[1])
-    term_temp = {i for i in term_temp if term_temp.count(i)>1}   # 重复的go term，对应的GO 可能是别称
+    term_temp = {i for i in term_temp if term_temp.count(i)>1}
     
-    all_enrich_go_list = [line[0] for line in enrich]
-    alt_go_dict = eval(open("/home/fdong/auto_protein_analysis/go_obo_data/alt_go_dict.txt","r").read())
-    pop_index = set()
-    for i in range(len(enrich)):
-        line = enrich[i]
-        if line[0] in alt_go_dict.keys():
-            for j in alt_go_dict[line[0]]:
-                if j not in all_enrich_go_list:
-                    continue
-                else:
-                    index = all_enrich_go_list.index(j)
-                    pop_index.add(index)
-                changed_protein = set(enrich[i][4].split(","))
-                changed_protein.update(enrich[index][4].split(","))
-                enrich[i][4]=','.join(changed_protein)  # 合并alt_id中的go对应的蛋白
-                if line[1] in term_temp:
-                    term_temp.remove(line[1])
-    for i in pop_index:
-        enrich.pop(i)
-        all_enrich_go_list.pop(i)
-    # 上述循环，更新合并具有alt_id的GO对应的protein，并将其alt_id从enrich中剔除
-
-
-    while term_temp:
-        term = term_temp.pop()
-        protein = set()
-        pop_index = list()
-        for i in range(len(enrich)):
-            if enrich[i][1] == term :
-                protein.update(enrich[i][4].split(","))
-                pop_index.append(i)
-        if pop_index:
-            change_id = pop_index.pop()
-            changed_protein = set(enrich[change_id][4].split(","))
-            changed_protein.update(protein)
-            enrich[change_id][4] = ",".join(changed_protein)
-            for i in pop_index:
-                enrich.pop(i)
-    # 以上，合并多个go同为alt_id但是无最新，即都在alt_go_dict的values中。
-
-
-#    alt_go_file = open("/home/fdong/auto_protein_analysis/go_obo_data/alt_go.txt","r")
-#    alt_go = list()
-#    for line in alt_go_file:
-#        alt_go.append(line.strip())
     for i in range(len(enrich)):
 #        line_temp = enrich[i][0:3]+ [str(fdr_list[i]),enrich[i][8], enrich[i][3]] + enrich[i][5:8] + [enrich[i][-1], enrich[i][4]]
-#        if (enrich[i][1] in term_temp) and (enrich[i][0] in alt_go):
-#            continue
+        if (enrich[i][1] in term_temp) and (enrich[i][0] in alt_go):
+            continue
+
         line_temp = enrich[i][0:3]+ [str(fdr_list[i]),enrich[i][8], enrich[i][3]] + [enrich[i][-1], enrich[i][4]]
         line = "\t".join(line_temp) + "\n"
         enrich_file.write(line)
@@ -486,7 +445,7 @@ def go_level2_plot(group,diff_multi):
     plt.close()
 
 # todo 从EXCEL中提取信息---done
-# todo 区分itraq和lable free
+# todo 区分itraq和lable free:
 def get_protein_from_xlsx():
     """
     Get diff/all proteins info form excel files.
@@ -501,11 +460,12 @@ def get_protein_from_xlsx():
  
     workbook = xlrd.open_workbook(u'附件1_蛋白质鉴定列表.xlsx')
     table = workbook.sheets()[0]
-    protein_all = table.col_values(0)
+    protein_all = table.col_values(1)
     protein_all.pop(0)
-    if "|" in protein_all[1]:
-        for i in range(len(protein_all)):
-             protein_all[i] = protein_all[i].split("|")[1]
+#    if "|" in protein_all[1]:
+    for i in range(len(protein_all)):
+#        if ";" in protein_all[i]:
+        protein_all[i] = protein_all[i].split("|")[0]
 
     workbook = xlrd.open_workbook(u'附件3_蛋白质定量和差异分析列表.xlsx')
     sheet_names = workbook.sheet_names()  # 查看sheet name  # 确定分组信息
@@ -527,14 +487,14 @@ def get_protein_from_xlsx():
  #   average_index_dict = dict()
     for sheet_name in sheet_names:
         worksheet = workbook.sheet_by_name(sheet_name)
-        protein_ids_raw = worksheet.col_values(0)
+        protein_ids_raw = worksheet.col_values(1)
         if u"显著性差异分析" in sheet_name:
            sheet_name = sheet_name.replace(u"显著性差异分析","")
            protein_ids_raw_temp = list()
            temp = protein_ids_raw.pop(0)
            protein_ids_raw_temp.append(temp)
            for id in protein_ids_raw:
-               id = id.split("|")[1]
+               id = id.split(";")[0]
                protein_ids_raw_temp.append(id)
            protein_ids_raw = protein_ids_raw_temp
         protein_fcs = worksheet.col_values(-2)
@@ -565,6 +525,15 @@ def get_protein_from_xlsx():
                 sample_name_list.append(name.replace("LFQ intensity ",""))
                 sample_index_list.append(protein_col_names.index(name))
                 group_index_dict[group_name[1]].extend([protein_col_names.index(name)])
+            if (".raw.PG.Quantity" in name) and (group_name[0] in name):
+                sample_name_list.append(name.replace(".raw.PG.Quantity",""))
+                sample_index_list.append(protein_col_names.index(name))
+                group_index_dict[group_name[0]].extend([protein_col_names.index(name)])
+            if (".raw.PG.Quantity" in name) and (group_name[1] in name):
+               sample_name_list.append(name.replace(".raw.PG.Quantity",""))
+               sample_index_list.append(protein_col_names.index(name))
+               group_index_dict[group_name[1]].extend([protein_col_names.index(name)])
+ 
             if "Average {0}".format(group_name[0]) in name:
                 average_index_dict[group_name[0]]= protein_col_names.index(name)
             if "Average {0}".format(group_name[1]) in name:
@@ -605,11 +574,11 @@ def get_protein_from_xlsx():
     if sheet_names_youwu:                            # 生成有无
         for sheet_name in sheet_names_youwu:
             worksheet = workbook.sheet_by_name(sheet_name)
-            protein_ids_raw = worksheet.col_values(0)
+            protein_ids_raw = worksheet.col_values(1)
             protein_ids_raw_temp = list()
             protein_ids_raw.pop(0)
             for id in protein_ids_raw:
-                id = id.split("|")[1]
+                id = id.split(";")[0]
                 protein_ids_raw_temp.append(id)
             protein_ids_raw = protein_ids_raw_temp
             group_name = sheet_name.replace(u"有无差异分析","").replace(" ","_")
@@ -623,6 +592,60 @@ def get_protein_from_xlsx():
     for name in protein_diffs_dict:
         open("./GO/{0}/protein_diff_{0}.txt".format(name), "w").write("\n".join(protein_diffs_dict[name]))
     return group_names
+
+
+def get_fasta_offline(file,group_names):
+    ids = dict()
+    result = open("./GO/ALL/all_raw.fasta","w")
+    with open(file,"r") as f:
+        for line in f:
+            if ">" in line:
+                id = line.strip()[1:]
+                ids[id]=""
+#                result.write(">{0}\n".format(id))
+                continue
+            ids[id] = ids[id]+line
+#            result.write(line)
+#    result.close()
+#    shutil.copy("./GO/ALL/query_all.fasta","./GO")
+    
+    protein_all = open("./GO/ALL/protein_all.txt","r")
+    for protein in protein_all:
+        protein = protein.strip()
+        if ";" in protein:
+            protein = protein.split(";")[0]
+        if protein in ids.keys():
+           result.write(">{0}\n{1}".format(protein,ids[protein]))
+        else:
+            print("protein: {0} in ALL don't exists in query_all.fasta. ")
+    result.close()
+    protein_all.close()
+
+    for group in group_names:
+        fasta_file = open("./GO/{0}/diff_{0}_raw.fasta".format(group),"w")
+        protein_diff = open("./GO/{0}/protein_diff_{0}.txt".format(group),"r")
+        for protein in protein_diff:
+            protein = protein.strip()
+            if protein in ids.keys():
+                fasta_file.write(">{0}\n{1}".format(protein,ids[protein]))
+            else:
+                print("protein: {0} in group:{1} don't exists in query_all.fasta. ".format(protein,group))
+        fasta_file.close()
+        protein_diff.close()
+        if os.path.exists("./GO/{}/protein_youwu.txt".format(group)):
+            fasta_file = open("./GO/{0}/youwu_raw.fasta".format(group),"w")
+            protein_diff = open("./GO/{0}/protein_youwu.txt".format(group),"r")
+            for protein in protein_diff:
+                protein = protein.strip()
+                if protein in ids.keys():
+                  fasta_file.write(">{0}\n{1}".format(protein,ids[protein]))
+                else:
+                    print("protein: {0} in group:{1} don't exists in query_all.fasta. ".format(protein,group))
+            fasta_file.close()
+            protein_diff.close()
+        
+ #       shutil.copy("./GO/{0}/query_diff_{0}.fasta".format(group),"./GO")        
+  
 
 
 #todo 从uniprot数据库查询并下载fasta  ---done
@@ -718,13 +741,17 @@ def with_uniprot(group_names):
             file_name = "./GO/{0}/protein_diff_{0}.txt".format(group)
             if os.path.exists("./GO/{0}/diff_{0}_raw.fasta".format(group)):
                  _with_uniport_data_analysis(file_name,group)
-                 continue
-            _with_uniport(file_name,group)
-            _with_uniport_data_analysis(file_name,group)
-            if os.path.exists("./GO/{0}/protein_youwu.txt".format(group)):
-                file_name = "./GO/{0}/protein_youwu.txt".format(group)
+            else:
                 _with_uniport(file_name,group)
                 _with_uniport_data_analysis(file_name,group)
+            if os.path.exists("./GO/{0}/protein_youwu.txt".format(group)):
+                file_name = "./GO/{0}/protein_youwu.txt".format(group)
+                if  os.path.exists("./GO/{}/youwu_raw.fasta".format(group)): # continue
+                    _with_uniport_data_analysis(file_name,group)
+                else:
+                    _with_uniport(file_name,group)
+                    _with_uniport_data_analysis(file_name,group)
+
  
 
 
@@ -790,26 +817,18 @@ def go_level_merge(go_info_diff,group):
         line = line.split("\t")
         go_protein_dict[line[0]] = set(line[-1].strip().split(","))
 
-    i=1
-    is_chage = True
-    while is_chage:
-        #print("第{0}轮检查".format(i))
-        temp = go_protein_dict.copy()       
-        for go in list(go_protein_dict.keys()):
-            child_go = parsed_up2down(go, go_tree_up2down)
-            for child in child_go:
-                if child in go_protein_dict:
-                    go_protein_dict[go].update(go_protein_dict[child])   # 将其子节点的蛋白加到当前节点中
+    for go in list(go_protein_dict.keys()):
+        child_go = parsed_up2down(go, go_tree_up2down)
+        for child in child_go:
+            if child in go_protein_dict:
+                go_protein_dict[go].update(go_protein_dict[child])   # 将其子节点的蛋白加到当前节点中
 
-            parent_go = parsed_down2up(go, go_tree_down2up)
-            for parent in parent_go:
-                if parent in go_protein_dict:
-                    go_protein_dict[parent].update(go_protein_dict[go])   #父节点存在时，将当前节点的蛋白更新到父节点中
-                else:
-                    go_protein_dict[parent] = set(go_protein_dict[go])        #父节点bu存在时，添加父节点
-        if temp == go_protein_dict:
-            is_chage=False
-        i+=1
+        parent_go = parsed_down2up(go, go_tree_down2up)
+        for parent in parent_go:
+            if parent in go_protein_dict:
+                go_protein_dict[parent].update(go_protein_dict[go])   #父节点存在时，将当前节点的蛋白更新到父节点中
+            else:
+                go_protein_dict[parent] = go_protein_dict[go]        #父节点存在时，添加父节点
 
     bp_mf_cc_merged = open("./GO/{0}/bp_mf_cc_merged.txt".format(group),"w")
 
@@ -1023,6 +1042,9 @@ def init_processes():
             shutil.copy(fasta_file_name,"./GO/{0}/diff_{0}_raw.fasta".format(line[0]))
     group_names_all = list(group_names)
     group_names_all.append("all")
+    print(group_names)
+    get_fasta_offline("raw.gene.fasta",group_names)
+    print("*******"*30)
     with_uniprot(group_names_all)
     return group_names
 

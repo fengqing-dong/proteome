@@ -27,7 +27,8 @@ import shutil
 import numpy as np
 from matplotlib import cm
 from matplotlib.colors import ListedColormap
-
+import openpyxl
+from openpyxl.styles import Font
 
 # import sys
 # reload(sys)
@@ -507,6 +508,15 @@ def get_protein_from_xlsx():
         for i in range(len(protein_all)):
              protein_all[i] = protein_all[i].split("|")[1]
 
+    gene_all = table.col_values(1)
+    gene_all.pop(0)
+    for i in range(len(gene_all)):
+        if not gene_all[i]:
+            gene_all[i] = "-"
+    protein_to_gene = dict(zip(protein_all,gene_all))
+    
+
+
     workbook = xlrd.open_workbook(u'附件3_蛋白质定量和差异分析列表.xlsx')
     sheet_names = workbook.sheet_names()  # 查看sheet name  # 确定分组信息
     sheet_names_youwu = list()
@@ -527,16 +537,24 @@ def get_protein_from_xlsx():
  #   average_index_dict = dict()
     for sheet_name in sheet_names:
         worksheet = workbook.sheet_by_name(sheet_name)
-        protein_ids_raw = worksheet.col_values(0)
+        col_index_for_protin_IDs = 0
+        for index, cell in enumerate(worksheet.row_values(0)):
+            if "Master Protein Accessions" in cell:
+                col_index_for_protin_IDs = index
+            if "Phospho Modifications" in cell:
+                col_index_phoshpo = index
+        protein_ids_raw = worksheet.col_values(col_index_for_protin_IDs)
         if u"显著性差异分析" in sheet_name:
-           sheet_name = sheet_name.replace(u"显著性差异分析","")
-           protein_ids_raw_temp = list()
-           temp = protein_ids_raw.pop(0)
-           protein_ids_raw_temp.append(temp)
-           for id in protein_ids_raw:
-               id = id.split("|")[1]
-               protein_ids_raw_temp.append(id)
-           protein_ids_raw = protein_ids_raw_temp
+            sheet_name = sheet_name.replace(u"显著性差异分析","")
+#        protein_ids_raw_temp = list()
+#        temp = protein_ids_raw.pop(0)
+#        protein_ids_raw_temp.append(temp)
+#        for id in protein_ids_raw:
+#            if "|" in id:
+#                id = id.split("|")[1]
+#                protein_ids_raw_temp.append(id)
+#        protein_ids_raw = protein_ids_raw_temp
+        modified_site = worksheet.col_values(col_index_phoshpo)
         protein_fcs = worksheet.col_values(-2)
         protein_P_values = worksheet.col_values(-1)
         protein_col_names = worksheet.row_values(0)
@@ -576,24 +594,29 @@ def get_protein_from_xlsx():
                 value_average_dict[col_index]=average_index_dict[key]
         protein_diff = list()
         diff_proteins_signal =list()
-        for i in range(1,len(protein_ids_raw)):
-            # print(protein_P_values[i])
-            protein_signal = list()
-            # print(protein_P_values[i],"--",protein_fcs[i],"++++")
-            # print(protein_ids_raw[i])
+        for i in range(1,worksheet.nrows):
             if not protein_P_values[i]:
                 break
             if (float(protein_P_values[i])<0.05 and (float(protein_fcs[i])>=fc_custome or float(protein_fcs[i])<=round(1/fc_custome,6))):
-                protein_diff.append(protein_ids_raw[i])  # 获取差异蛋白的名称
-                protein_signal.append(protein_ids_raw[i])
-                for index in sample_index_list:
-                    if not worksheet.cell_value(i,index):                  #空值检查，并填补 
-                        signal = str(worksheet.cell_value(i,value_average_dict[index]))
-                        protein_signal.append(signal)
-                    else:
-                        protein_signal.append(str(worksheet.cell_value(i, index)))
-            if protein_signal:
-                diff_proteins_signal.append(protein_signal)
+                multi_protein = list()
+                for protein in protein_ids_raw[i].replace(" ","").split(";"):
+                    protein_signal = list()
+                    if "|" in protein:
+                        protein  = protein.split("|")[1]
+                    protein_diff.append(protein)  # 获取差异蛋白的名称
+                    site = re.findall(r"\[(.*)\]",modified_site[i])[0].replace(" ","")
+                    protein_modified_names ="{0}_{1}_[{2}]".format(protein,i,site)  # 在cluster中需要标注蛋白的修饰位点
+                    protein_signal.append(protein_modified_names)
+                    for index in sample_index_list:
+                        if not worksheet.cell_value(i,index):                  #空值检查，并填补 
+                            signal = str(worksheet.cell_value(i,value_average_dict[index]))
+                            protein_signal.append(signal)
+                        else:
+                            protein_signal.append(str(worksheet.cell_value(i, index)))
+                    multi_protein.append(protein_signal)
+                for protein_signal in multi_protein:
+                #    print(protein_signal)
+                    diff_proteins_signal.append(protein_signal)
         protein_diffs_name_list.append(protein_diff)
 
         cluster = open("./GO/{0}/cluster_diff.txt".format(sheet_name.replace(" ", "_"),),"w")
@@ -605,7 +628,7 @@ def get_protein_from_xlsx():
     if sheet_names_youwu:                            # 生成有无
         for sheet_name in sheet_names_youwu:
             worksheet = workbook.sheet_by_name(sheet_name)
-            protein_ids_raw = worksheet.col_values(0)
+            protein_ids_raw = worksheet.col_values(col_index_for_protin_IDs)
             protein_ids_raw_temp = list()
             protein_ids_raw.pop(0)
             for id in protein_ids_raw:
@@ -622,7 +645,7 @@ def get_protein_from_xlsx():
     open("./GO/ALL/protein_all.txt", "w").write("\n".join(protein_all))
     for name in protein_diffs_dict:
         open("./GO/{0}/protein_diff_{0}.txt".format(name), "w").write("\n".join(protein_diffs_dict[name]))
-    return group_names
+    return group_names,protein_to_gene
 
 
 #todo 从uniprot数据库查询并下载fasta  ---done
@@ -1003,10 +1026,80 @@ def hcluster2(group):
     plot_cluster_heatmap_detail(file)
     plot_cluster_heatmap_small(file)
 
+def pretreatment_of_attachment3():
+    workbook = openpyxl.load_workbook(file)
+    workbook2 = openpyxl.Workbook()
+    sheet_names = workbook.sheetnames
+    for sheet in sheet_names:
+        worksheet = workbook[sheet]
+        worksheet2 = workbook2.create_sheet()
+        worksheet2.title = sheet
+        col_index_for_protin_IDs = 0
+        for index, cell in enumerate(worksheet.row_values(0)):
+            if "Master Protein Accessions" in cell:
+                col_index_for_protin_IDs = index
+        for row in enumerate(worksheet.rows):
+            row_values = [cell.value for cell in row]
+            temp = row_values.copy()
+            if ";" in row_values[col_index_for_protin_IDs]:
+                for protein in row_values[col_index_for_protin_IDs].replace(" ","").split(";"):
+                    temp[col_index_for_protin_IDs]= protein
+                    worksheet2.append(temp)
+    workbook2.save("After_" + file)
+
+
+
+
+
+
+def modify_excel(file,protein_to_gene):
+    protein_to_gene["Master Protein Accessions"] = "Gene Name"
+    def _modifing(file,protein_to_gene):
+        ft= Font(name="Arial",size=11)
+        workbook=openpyxl.load_workbook(file)
+        sheet_names = workbook.sheetnames
+        for sheet in sheet_names:
+            worksheet = workbook[sheet]
+            columns_names = [cell.value for cell in list(worksheet.rows)[0]]
+            index = [index for index,name in enumerate(columns_names) if "Master Protein Accessions" in name ][0]
+            proteins_ids = list(worksheet.columns)[index]
+            genes = []
+            for protein in proteins_ids:
+                protein = protein.value
+                if not protein:
+                    genes.append("-")
+                elif ";" in protein:
+                    protein = protein.replace(" ","")
+                    protein = protein.split(";")
+                    genes.append("; ".join([protein_to_gene[temp] for temp in protein]))
+                else:
+                    genes.append(protein_to_gene[protein])
+            worksheet.insert_cols(index+2)
+            for i,cell in enumerate(list(worksheet.columns)[index+1]):
+                cell.value = genes[i]
+                cell.font = ft
+            if "附件3" in file:
+                worksheet.insert_cols(1)
+                for i,cell in enumerate(list(worksheet.columns)[0]):
+                    if i ==0:
+                        cell.value = "Number"
+                        cell.font = ft
+                    else:
+                        cell.value = i
+                        cell.font = ft
+        workbook.save(file)
+    _modifing(file,protein_to_gene)
+
+
+
+
 
 def init_processes():
     if os.path.exists(u"附件1_蛋白质鉴定列表.xlsx") and os.path.exists(u"附件3_蛋白质定量和差异分析列表.xlsx"):
-        group_names = get_protein_from_xlsx()
+        group_names,protein_to_gene = get_protein_from_xlsx()
+        if os.path.exists("附件2_肽段鉴定列表.xlsx"):
+            modify_excel("附件2_肽段鉴定列表.xlsx", protein_to_gene)
+        modify_excel("附件3_蛋白质定量和差异分析列表.xlsx", protein_to_gene) # 附件3_蛋白质定量和差异分析列表.xlsx
     elif os.path.exists("sample.txt") and os.path.exists("all_raw.fasta"):
         if not os.path.exists("GO"):
             os.makedirs("GO")

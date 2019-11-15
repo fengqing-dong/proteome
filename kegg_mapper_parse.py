@@ -18,7 +18,7 @@ from matplotlib.font_manager import FontProperties
 import math
 import multiprocessing
 import sys
-
+import openpyxl
 
 
 def download_file(download_url, file_name, file_format,diff_or_all):
@@ -607,8 +607,6 @@ def txt2excel(group):
     path = "./KEGG_diff/{0}/".format(group)
     command = "perl /home/fdong/auto_protein_analysis/TXToXLSX.pl {0}KEGG.xlsx {0}query2map.txt {0}map2query.txt {0}enrichment.txt".format(path)
     os.system(command)
-
-
 
 
 def main_func(taxid=None,email_info=None,map_download=None):
