@@ -342,7 +342,8 @@ def file_generate(diff_or_all):
         mappids = open("./KEGG_all/mappids_{0}.txt".format(diff_or_all), "w")
         map2query = open("./KEGG_all/map2query_{0}.txt".format(diff_or_all), "w")
     else:
-        diff_group = diff_or_all.strip().split("_")[1]
+        #diff_group = diff_or_all.strip().split("_")[1]
+        diff_group  = diff_or_all.replace("diff_","")
         query2map = open("./KEGG_diff/{0}/query2map.txt".format(diff_group), "w")
         mappids = open("./KEGG_diff/{1}/mappids_{0}.txt".format(diff_or_all,diff_group), "w")
         map2query = open("./KEGG_diff/{0}/map2query.txt".format(diff_group), "w")
@@ -427,8 +428,8 @@ def file_move(diff_multi):
 def kegg_enrich(diff_multi,all_total):
     for diff_or_all in diff_multi.keys():
         diff_total = diff_multi[diff_or_all]
-        diff_group = diff_or_all.strip().split("_")[1]
-
+        #diff_group = diff_or_all.strip().split("_")[1]
+        diff_group = diff_or_all.replace("diff_",'')
 
         #todo 进入多分组的子文件夹后富集分析  ---done
         map2query_diff = open("./KEGG_diff/{0}/map2query.txt".format(diff_group), "r")
@@ -498,7 +499,8 @@ def kegg_enrich(diff_multi,all_total):
 
 def enrich_kegg_plot(diff_multi):
     for diff_or_all in diff_multi.keys():
-        diff_or_all = diff_or_all.strip().split("_")[1]
+        #diff_or_all = diff_or_all.strip().split("_")[1]
+        diff_or_all = diff_or_all.replace("diff_","")
         file = open("./KEGG_diff/{0}/enrich_kegg.txt".format(diff_or_all), "r")
 
         name = list()
@@ -627,9 +629,11 @@ def main_func(taxid=None,email_info=None,map_download=None):
             print("\n","*"*30,"\n")
             print("执行正常：正在处理{0}文件！".format(file))
             #TODO 文件夹检查---done
+        
             if re.search("diff",file):
                 diff_or_all = re.findall(r"query_(diff_.*)\.fasta",file, re.IGNORECASE)[0]
-                diff_group = diff_or_all.split("_")[1]
+                # diff_group = diff_or_all.split("_")[1:]
+                diff_group = diff_or_all.replace("diff_","")
                 if not os.path.exists("KEGG_diff/{0}".format(diff_group)):
                     os.makedirs("KEGG_diff/{0}".format(diff_group))
                 ko_diff_filename = generate_user_ko_offline("user_ko_all.txt", file, diff_or_all)

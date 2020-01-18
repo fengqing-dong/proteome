@@ -85,7 +85,9 @@ def run_blast2go_cli(taxid,group_names):
     fasta_file_name = "GO/query_all.fasta"
     raw_path = os.getcwd()
     fasta_file_name = os.path.join(os.getcwd(),fasta_file_name)
+    print(fasta_file_name)
     annot_file_dir = os.getcwd().split("/")[-1]
+    print(annot_file_dir)
     cli_path = "/genechem/program/blast2go_cli_v1.4.4" #"/home/lijuan.chen/blast2go_commandline/blast2go_cli_v1.3.3"
     os.chdir(cli_path)
     #print(os.getcwd())

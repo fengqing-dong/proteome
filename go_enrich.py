@@ -407,6 +407,7 @@ def enrich_go_plot(group):
 
 
 def go_level2_plot(group,diff_multi):
+    print(group)
     diff_num = diff_multi[group]
     level2 = open("./GO/{0}/Level2.txt".format(group), "r")
 
@@ -1003,6 +1004,59 @@ def hcluster2(group):
     plot_cluster_heatmap_detail(file)
     plot_cluster_heatmap_small(file)
 
+def get_fasta_offline(file,group_names):
+    ids = dict()
+    result = open("./GO/ALL/all_raw.fasta","w")
+    with open(file,"r") as f:
+        for line in f:
+            if ">" in line:
+                id = line.strip()[1:]
+                ids[id]=""
+#                result.write(">{0}\n".format(id))
+                continue
+            ids[id] = ids[id]+line
+#            result.write(line)
+#    result.close()
+#    shutil.copy("./GO/ALL/query_all.fasta","./GO")
+    
+    protein_all = open("./GO/ALL/protein_all.txt","r")
+    for protein in protein_all:
+        protein = protein.strip()
+        if ";" in protein:
+            protein = protein.split(";")[0]
+        if protein in ids.keys():
+           result.write(">{0}\n{1}".format(protein,ids[protein]))
+        else:
+            print("protein: {0} in ALL don't exists in query_all.fasta. ")
+    result.close()
+    protein_all.close()
+
+    for group in group_names:
+        fasta_file = open("./GO/{0}/diff_{0}_raw.fasta".format(group),"w")
+        protein_diff = open("./GO/{0}/protein_diff_{0}.txt".format(group),"r")
+        for protein in protein_diff:
+            protein = protein.strip()
+            if protein in ids.keys():
+                fasta_file.write(">{0}\n{1}".format(protein,ids[protein]))
+            else:
+                print("protein: {0} in group:{1} don't exists in query_all.fasta. ".format(protein,group))
+        fasta_file.close()
+        protein_diff.close()
+        if os.path.exists("./GO/{}/protein_youwu.txt".format(group)):
+            fasta_file = open("./GO/{0}/youwu_raw.fasta".format(group),"w")
+            protein_diff = open("./GO/{0}/protein_youwu.txt".format(group),"r")
+            for protein in protein_diff:
+                protein = protein.strip()
+                if protein in ids.keys():
+                  fasta_file.write(">{0}\n{1}".format(protein,ids[protein]))
+                else:
+                    print("protein: {0} in group:{1} don't exists in query_all.fasta. ".format(protein,group))
+            fasta_file.close()
+            protein_diff.close()
+        
+ #       shutil.copy("./GO/{0}/query_diff_{0}.fasta".format(group),"./GO")        
+  
+
 
 def init_processes():
     if os.path.exists(u"附件1_蛋白质鉴定列表.xlsx") and os.path.exists(u"附件3_蛋白质定量和差异分析列表.xlsx"):
@@ -1016,6 +1070,7 @@ def init_processes():
         sample = open("sample.txt","r")
         for line in sample:
             line = line.strip().split("\t")
+            print(line)
             group_names.append(line[0])
             fasta_file_name = line[1]
             if not os.path.exists("./GO/{0}".format(line[0])):
@@ -1023,6 +1078,10 @@ def init_processes():
             shutil.copy(fasta_file_name,"./GO/{0}/diff_{0}_raw.fasta".format(line[0]))
     group_names_all = list(group_names)
     group_names_all.append("all")
+    print(group_names)
+    if os.path.exists("raw.gene.fasta"):
+        get_fasta_offline("raw.gene.fasta",group_names)
+    print("*******"*30)
     with_uniprot(group_names_all)
     return group_names
 

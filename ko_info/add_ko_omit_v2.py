@@ -116,7 +116,8 @@ def add_omit_main():
 
 if __name__ == '__main__':
     start = time.time()  # 计时开始
-    # :os.remove("/home/fdong/auto_protein_analysis/ko_info/KO_INFO_END.txt")
+    #os.remove("/home/fdong/auto_protein_analysis/ko_info/KO_INFO_END.txt")
+#os.remove("/home/fdong/auto_protein_analysis/ko_info/KO_INFO.txt")
 
     check_and_backup()
     add_omit_main()
